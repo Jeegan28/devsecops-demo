@@ -1,3 +1,4 @@
+// jst for commit
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Award } from 'lucide-react';
 import Board from './components/Board';
