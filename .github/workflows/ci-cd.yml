@@ -79,7 +79,6 @@ jobs:
     needs: [build]
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
     outputs:
       image_tag: ${{ steps.vars.outputs.short_sha }}
     steps:
@@ -102,22 +101,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.TOKEN }}
       
-      - name: Extract short SHA
+      - name: Extract short SHA and lowercase repo
         id: vars
-        run: echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: |
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "image_name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}
+          tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.short_sha }}
           load: true
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.short_sha }}
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -129,7 +130,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}
+          tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.short_sha }}
 
   update-k8s:
     name: Update Kubernetes Deployment
@@ -147,10 +148,15 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
       
+      - name: Extract lowercase repo
+        id: vars
+        run: |
+          echo "image_name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Update Kubernetes deployment file
         env:
           IMAGE_TAG: ${{ needs.docker.outputs.image_tag }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY: ${{ steps.vars.outputs.image_name }}
           REGISTRY: ghcr.io
         run: |
           NEW_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}:${IMAGE_TAG}"
@@ -163,3 +169,4 @@ jobs:
           git add kubernetes/deployment.yaml
           git commit -m "Update Kubernetes deployment with new image tag: ${{ needs.docker.outputs.image_tag }} [skip ci]" || echo "No changes to commit"
           git push
+
