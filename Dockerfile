@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine3.19
+FROM node:20-alpine3.19 AS build
 RUN apk update && apk upgrade
 WORKDIR /app
 COPY package*.json ./
