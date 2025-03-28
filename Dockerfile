@@ -1,5 +1,6 @@
 # Build stage
-FROM node:20-alpine3.19 AS build
+FROM node:20-alpine3.19
+RUN apk update && apk upgrade
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
